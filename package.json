@@ -1,0 +1,12 @@
+{
+  "name": "gulp-file-include",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "node src/utils.js"
+  },
+  "dependencies": {
+    "lodash": "^4.17.11"
+  }
+}
