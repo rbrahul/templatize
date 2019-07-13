@@ -48,15 +48,20 @@ amar sonar bangla
     
     {{@if(name == 'rahul')}}
         {{@if(1 == 1)}}
-        {{@if(2 == 2)}}
-            <h2> two is always equal to two</h1>
-        {{@endIf}}
-//FIXME: sibling condition doesn't work
+            {{@if(2 == 2)}}
+                <h2> two is always equal to two</h1>
+            {{@endIf}}
+
+            
        
             <h2> One is always equal to one</h1>
         {{@endIf}}
         <h2> May Is Rahul </h1>
     {{@endIf}}
+
+    {{@if(7 == 7)}}
+                <h2> 7 is always 7</h1>
+            {{@endIf}}
 
         <h2> I am here because He is honest and a is 3 </h1>
     {{@elseIf(a==6)}}
@@ -199,7 +204,6 @@ const getCodeBock = (text, startFlug, endFlug) => {
     const matcherPattern = new RegExp(`${startFlug}|${endFlug}`);
     const startFlugMatch = new RegExp(startFlug);
     let result = matcherPattern.exec(block);
-
     while (result) {
         if (startFlugMatch.test(result[0])) {
             if (initialMatchIndex < 0) {
@@ -285,59 +289,84 @@ const evaluateIfElseStatement = (expressionIndex, context) => {
 }
 
 const parseIfElseLader = (content) => {
-    let blockIndex = 0;
+    let blockIndex = -1;
     let result = getCodeBock(
         content,
         `${IF_BLOCK.PREFIX}if\\(`,
         IF_BLOCK.SUFFIX,
     );
     const processedIfElseStack = []
-
-    let tobeParsed = '';
     const initialBlock = result && result.matched ? result.matched : '';
+    let currentIndex = -1;
     while (result && result.matched) {
-        tobeParsed = trim(result.matched, IF_BLOCK.PREFIX);
+        let tobeParsed = trim(result.matched, IF_BLOCK.PREFIX);
         tobeParsed = trim(tobeParsed, IF_BLOCK.SUFFIX);
-        
-            const nestedBlock = '__NESTED_BLOCK_' + blockIndex;
-            const ifElseParse = `\${evaluateIfElseStatement('${nestedBlock}', {})}`;
-            if(processedIfElseStack.length > 0) {
-                const headIfElseStack = processedIfElseStack[processedIfElseStack.length - 1].block;
-                 processedIfElseStack[processedIfElseStack.length - 1].block = headIfElseStack.replace(result.matched, ifElseParse)
-            }    
-            
-            processedIfElseStack.push({
-                index: nestedBlock,
-                block: tobeParsed,
-                params: {}
-            });
+        let current = tobeParsed;
 
-            result = getCodeBock(
-                processedIfElseStack[processedIfElseStack.length - 1].block,
-                `${IF_BLOCK.PREFIX}if\\(`,
-                IF_BLOCK.SUFFIX,
-            );
-            
-            blockIndex++;
+        const nestedBlock = '__NESTED_BLOCK_' + blockIndex++;
+        const ifElseParse = `\${evaluateIfElseStatement('${nestedBlock}', {})}`;
+
+        let headIfElseStack = initialBlock;
+
+        if(processedIfElseStack.length > 0) {
+            headIfElseStack = processedIfElseStack[currentIndex] && processedIfElseStack[currentIndex].block;
+        }
+
+        current = headIfElseStack.replace(result.matched, ifElseParse);
+        processedIfElseStack.push({
+            index: nestedBlock,
+            block: tobeParsed,
+            params: {}
+        });
+
+        const innerCheck = getCodeBock(
+            current, // no matched found then recent pushed or previous
+            `${IF_BLOCK.PREFIX}if\\(`,
+            IF_BLOCK.SUFFIX,
+        );
+
+        if(innerCheck && innerCheck.matched) {
+            result = innerCheck;
+            console(innerCheck);
+            continue;
+        } else {
+            processedIfElseStack[currentIndex] = Object.assign({},processedIfElseStack[currentIndex], {
+                block: current
+            });
+            // current index only updates when no match found in currentBlock
+            const nextBlock = processedIfElseStack[++currentIndex];
+            console.log(nextBlock);
+            if(nextBlock) {
+                result = getCodeBock(
+                    processedIfElseStack[processedIfElseStack.length - 1].block, // no matched found then recent pushed or previous
+                    `${IF_BLOCK.PREFIX}if\\(`,
+                    IF_BLOCK.SUFFIX,
+                );
+                continue;
+            } else {
+                break;
+            }
+        }
     }
     processedIfElseStack.forEach(({index, block}) => {
-        console.log(block,"\n\n\n===========\n");
+        console.log(block,"==============\n\n");
         tempalteMapping[index] = block;
     });
+   // console.log(processedIfElseStack[0] )
     let template = '';
-    console.log(processedIfElseStack[0].block,"\n\n\n===========\n");
-   // eval(processedIfElseStack[0].block);
+    eval(processedIfElseStack[0].block);
     return content.replace(initialBlock, template);
 };
 
 const processAllIfElse = (content) => {
     let template = content;
-    parseIfElseLader(template);
-  /*  let parsed = getCodeBock(
+    let parsed = getCodeBock(
         template,
         `${IF_BLOCK.PREFIX}if\\(`,
         IF_BLOCK.SUFFIX,
     );
+    console.log(parsed)
+/*
     while(parsed) {
         template = parseIfElseLader(template);
         parsed = getCodeBock(
@@ -345,8 +374,8 @@ const processAllIfElse = (content) => {
             `${IF_BLOCK.PREFIX}if\\(`,
             IF_BLOCK.SUFFIX,
         );
-    }
-    */
+    }*/
+    
     return template;
 }
 
@@ -358,10 +387,7 @@ const processTemplate = () => {
     content = processIterations(content);
     content = processElseIfLader(content);
     content = processAllIfElse(content);
-    
-
-   //console.log(content);
-
+       console.log(content);
     //content = processExpression(content,data);
     //content = processIfElseLader(content);
     //export to dist;
