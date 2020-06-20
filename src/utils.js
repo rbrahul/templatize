@@ -1,4 +1,6 @@
 const trim = require('lodash/trim');
+const { getCodeBlock } = require('./getCodeBlock');
+const getDeepestCodeBlock = require('./getDeepestCodeBlock');
 
 //TODO: Implment File Tree  Inclusion
 //TODO: Expressions
@@ -38,9 +40,7 @@ amar sonar bangla
 <h1>ID: {{index}}</h1>
 {{@endForEach}}
 
-{{
-    @if(a == 5)
-    }}
+{{@if(a == 5)}}
         <h2> I am here because He is honest </h1>
     {{
     @elseIf(a==3)
@@ -48,6 +48,22 @@ amar sonar bangla
     
     {{@if(name == 'rahul')}}
         <h2> May Is Rahul </h1>
+        {{@if(3 == 'three')}}
+            <h2>Three is not alwasy 3 </h1>
+        {{@elseIf(3 == 3)}}
+            <p>3 is alwasy 3</p>
+            {{@if(3*2 == 5)}}
+            <h2>Two times 3 is 5 </h1>
+        {{@elseIf(3*2 == 6)}}
+            <p>two times 3 is 6  :)</p>
+        {{@else}}
+            <p>two times 3 is 9  :(</p>
+        {{@endIf}}
+        {{@endIf}}
+    {{@else}}
+
+    <h2>My name is Ripan </h2>
+
     {{@endIf}}
 
     
@@ -178,45 +194,6 @@ const processBlockExpression = (content) => {
 
 const processIfElseLader = () => {};
 
-const getCodeBock = (text, startFlug, endFlug) => {
-    let block = text;
-    let initialMatchIndex = -1;
-    let totalMatchedIndex = 0;
-    let currentIndex = -1;
-
-    var counter = {
-        startFlug: 0,
-        endFlug: 0,
-    };
-
-    const matcherPattern = new RegExp(`${startFlug}|${endFlug}`);
-    const startFlugMatch = new RegExp(startFlug);
-    let result = matcherPattern.exec(block);
-    while (result) {
-        if (startFlugMatch.test(result[0])) {
-            if (initialMatchIndex < 0) {
-                initialMatchIndex = result.index;
-            }
-            counter.startFlug++;
-        } else {
-            counter.endFlug++;
-        }
-
-        currentIndex = result.index + result[0].length;
-        totalMatchedIndex += currentIndex;
-        if (counter.startFlug == counter.endFlug) {
-            return {
-                startIndex: initialMatchIndex,
-                matched: text.substring(initialMatchIndex, totalMatchedIndex),
-                endIndex: totalMatchedIndex,
-            };
-        }
-        block = block.substring(currentIndex);
-        result = matcherPattern.exec(block);
-    }
-    return null;
-};
-
 const processIterations = (content) => {
     let template = content;
     let matched = forEachRegex.exec(template);
@@ -230,37 +207,44 @@ const processIterations = (content) => {
 
 const processElseIfLader = (content) => {
     let template = content;
-    let matched = elseIfLaderRegex.exec(template);
-    const identifiers = {
-        if: 'if',
-        elseif: 'else if',
-        else: 'else',
-    };
-    while (matched) {
-        let condition = matched[2] === 'if' ? IF_BLOCK.PREFIX : '';
-        const cases = ['else', 'elseif', 'if'];
-        if (cases.includes(matched[2].toLowerCase())) {
-            if (matched[4]) {
-                const closer = !matched[7].includes('@endIf')
-                    ? matched[7]
-                    : `\n${IF_BLOCK.SUFFIX}`;
+    let codeBlock = getDeepestCodeBlock(text, '{{@if\\(', '@endIf}}');
+    while (codeBlock && codeBlock.matched) {
+        let templateBlock = codeBlock.matched;
+        let matched = elseIfLaderRegex.exec(templateBlock);
+        const identifiers = {
+            if: 'if',
+            elseif: 'else if',
+            else: 'else',
+        };
+        while (matched) {
+            let condition = matched[2] === 'if' ? IF_BLOCK.PREFIX : '';
+            const cases = ['else', 'elseif', 'if'];
+            if (cases.includes(matched[2].toLowerCase())) {
+                if (matched[4]) {
+                    // IF, ELSE_IF but NOT Else
+                    const closer = !matched[7].includes('@endIf')
+                        ? matched[7]
+                        : `\n${IF_BLOCK.SUFFIX}`;
 
-                condition += `${identifiers[matched[2].toLowerCase()]}(${
-                    matched[4]
-                }) {
-                    template += \`${matched[5]}\`;
-                 } ${closer}`;
+                    condition += `${identifiers[matched[2].toLowerCase()]}(${
+                        matched[4]
+                    }) {
+                        template += \`${matched[5]}\`;
+                     } ${closer}`;
+                } else {
+                    // If it's else
+                    condition = `${matched[2].toLowerCase()} {
+              template += \`${matched[5]}\`;
+                    }\n${IF_BLOCK.SUFFIX}`;
+                }
             } else {
-                condition = `${matched[2].toLowerCase()} {
-          template += \`${matched[5]}\`;
-                }\n${IF_BLOCK.SUFFIX}`;
+                console.log('Not matched');
             }
-        } else {
-            console.log('Not matched');
+            templateBlock = templateBlock.replace(matched[0], condition);
+            matched = elseIfLaderRegex.exec(templateBlock);
         }
-
-        template = template.replace(matched[0], condition);
-        matched = elseIfLaderRegex.exec(template);
+        template = template.replace(codeBlock.matched, templateBlock);
+        codeBlock = getDeepestCodeBlock(template, '{{@if\\(', '@endIf}}');
     }
     return template;
 };
@@ -273,6 +257,7 @@ const evaluateIfElseStatement = (expressionIndex, context) => {
     }
     return template;
 };
+
 const getToBeParsed = (text) => {
     let tobeParsed = trim(text, IF_BLOCK.PREFIX);
     return trim(tobeParsed, IF_BLOCK.SUFFIX);
@@ -280,7 +265,7 @@ const getToBeParsed = (text) => {
 
 const parseIfElseLader = (content) => {
     let blockIndex = 0;
-    let result = getCodeBock(
+    let result = getCodeBlock(
         content,
         `${IF_BLOCK.PREFIX}if\\(`,
         IF_BLOCK.SUFFIX,
@@ -296,7 +281,7 @@ const parseIfElseLader = (content) => {
     const initialBlock = result && result.matched ? result.matched : '';
 
     while (result && result.matched) {
-        const innerCheck = getCodeBock(
+        const innerCheck = getCodeBlock(
             getToBeParsed(result.matched), // no matched found then recent pushed or previous
             `${IF_BLOCK.PREFIX}if\\(`,
             IF_BLOCK.SUFFIX,
@@ -334,15 +319,14 @@ const parseIfElseLader = (content) => {
 
 const processAllIfElse = (content) => {
     let template = content;
-    let parsed = getCodeBock(
+    let parsed = getCodeBlock(
         template,
         `${IF_BLOCK.PREFIX}if\\(`,
         IF_BLOCK.SUFFIX,
     );
-    let i = 0;
     while (parsed) {
         template = parseIfElseLader(template);
-        parsed = getCodeBock(
+        parsed = getCodeBlock(
             template,
             `${IF_BLOCK.PREFIX}if\\(`,
             IF_BLOCK.SUFFIX,
@@ -357,8 +341,9 @@ const processTemplate = () => {
     const { statements } = parseTemplate(text);
     let content = processInclution(text, statements);
     const forEachExpressions = getAllForEachSyntaxes(content);
-    //ontent = processIterations(content);
+    //content = processIterations(content);
     content = processElseIfLader(content);
+   // console.log(content);
     const parsedAllIfElse = processAllIfElse(content);
     console.log(parsedAllIfElse);
 
