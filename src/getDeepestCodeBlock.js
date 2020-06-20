@@ -5,7 +5,6 @@ const {getCodeBlock} = require('./getCodeBlock');
 const getTrimedBlock = (text, start, end) => {
     text = trim(text, start.replace('\+',''));
     text = trim(text,end.replace('\+',''));
-    console.log(text);
     return text;
 }
 

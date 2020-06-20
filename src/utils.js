@@ -26,7 +26,7 @@ const text = `
 {{@include('/template/c.html')}}
 
 
-{{@forEach(users)}}
+{{@forEach(users as user)}}
 <h1>Hello world</h1>
 amar sonar bangla
 
@@ -94,6 +94,7 @@ const templateB = `
 `;
 var a = 3;
 var users = [1, 2, 3];
+
 const data = {
     users: [1, 2, 3, 4, 5],
     players: [
@@ -148,7 +149,8 @@ const getIncludeStatements = (statements) =>
 const getExpressions = (content) => content.match(expressionRegex);
 
 const prepareValidExpression = (expression, context) => {
-    const statement = `with(context) {${expression};}`;
+    let globalContext = Object.assign({}, data, context);
+    const statement = `with(globalContext) {${expression};}`;
     return eval(statement);
 };
 
@@ -185,14 +187,13 @@ const processBlockExpression = (content) => {
     let template = content;
     let matched = blockRegex.exec(template);
     while (matched) {
-        const loopBlock = prepareValidExpression(matched[1], data);
+        const loopBlock = prepareValidExpression(matched[1], {});
         template = template.replace(matched[0], loopBlock);
         matched = blockRegex.exec(template);
     }
     return template;
 };
 
-const processIfElseLader = () => {};
 
 const processIterations = (content) => {
     let template = content;
@@ -336,19 +337,16 @@ const processAllIfElse = (content) => {
     return template;
 };
 
-const exprotToTarget = () => {};
 const processTemplate = () => {
     const { statements } = parseTemplate(text);
     let content = processInclution(text, statements);
-    const forEachExpressions = getAllForEachSyntaxes(content);
-    //content = processIterations(content);
+    content = processIterations(content);
+    content = processBlockExpression(content);
     content = processElseIfLader(content);
-   // console.log(content);
-    const parsedAllIfElse = processAllIfElse(content);
-    console.log(parsedAllIfElse);
+    content = processAllIfElse(content);
+    content = processExpression(content,{});
 
-    //content = processExpression(content,data);
-    //content = processIfElseLader(content);
+    console.log(content);
     //export to dist;
     process.exit();
 };
